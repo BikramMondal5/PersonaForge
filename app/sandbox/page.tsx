@@ -1079,7 +1079,8 @@ export default function SandboxPage() {
                 <div>
                   <h3 className="font-bold mb-2">Integration Methods</h3>
 
-                  <div className="bg-[#1e1e1e] text-white p-4 rounded-lg border-[3px] border-black overflow-x-auto relative mt-2 group">
+                  {/* cURL Request - Commented out for now */}
+                  {/* <div className="bg-[#1e1e1e] text-white p-4 rounded-lg border-[3px] border-black overflow-x-auto relative mt-2 group">
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs text-gray-400">cURL Request</div>
                       <button
@@ -1107,9 +1108,9 @@ export default function SandboxPage() {
                         "session_id": "user-session-123"
   }'`}
                     </pre>
-                  </div>
+                  </div> */}
 
-                  <div className="bg-white mt-4 p-4 rounded-lg border-[3px] border-black overflow-x-auto relative group">
+                  <div className="bg-white p-4 rounded-lg border-[3px] border-black overflow-x-auto relative group">
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs text-gray-500 font-bold">JavaScript / TypeScript Fetch</div>
                       <button

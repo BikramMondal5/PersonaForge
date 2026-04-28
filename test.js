@@ -1,8 +1,8 @@
-const response = await fetch("http://localhost:8000/v1/5271a944-5f5c-4bf6-baa0-08854635f50b/chat", {
+const response = await fetch("http://localhost:8000/v1/e912e583-7a2c-4ec3-a380-a30ee70c2649/chat", {
     method: "POST",
     headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer sk_E9hFgzzoOX2CthOIkBBrYIZzSvEQWZgD"
+        "Authorization": "Bearer sk_vCZjljwgwojJnGzDmadUfeWP22803j0n"
     },
     body: JSON.stringify({
         message: "Hello there!",
