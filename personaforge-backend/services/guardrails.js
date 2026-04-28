@@ -5,20 +5,20 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 function safeErrorMessage(error) {
     return error instanceof Error ? error.message : String(error);
 }
 
-function createGroqModel(temperature = 0) {
+function createGeminiModel(temperature = 0) {
     return new ChatOpenAI({
-        model: GROQ_MODEL,
+        model: GEMINI_MODEL,
         temperature,
-        apiKey: process.env.GROQ_API_KEY,
+        apiKey: process.env.GEMINI_API_KEY,
         configuration: {
-            baseURL: GROQ_BASE_URL,
+            baseURL: GEMINI_BASE_URL,
         },
     });
 }
@@ -66,7 +66,7 @@ async function claudeJudgeInput(message, domain) {
  */
 async function claudeJudgeOutput(response, rules, domain) {
     try {
-        const model = createGroqModel(0);
+        const model = createGeminiModel(0);
 
         const promptText = `You are a strict compliance validator. Evaluate if the response maintains persona integrity.
 

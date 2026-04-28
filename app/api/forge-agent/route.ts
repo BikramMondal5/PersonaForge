@@ -90,14 +90,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    const apiKey = process.env.GROQ_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY
 
     const extractedDomain = extractDomainFromText(prompt)
 
     // For demonstration purposes, if API key is missing, we'll return a mock response
-    // but the implementation is ready for Groq
+    // but the implementation is ready for Gemini
     if (!apiKey) {
-      console.warn('GROQ_API_KEY is missing. Returning mock response for Forge Engine.')
+      console.warn('GEMINI_API_KEY is missing. Returning mock response for Forge Engine.')
 
       // Simulate brief delay
       await new Promise(resolve => setTimeout(resolve, 3000))
@@ -150,14 +150,14 @@ Return only valid JSON. Use this format:
 User description:
 ${prompt}`
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'gemini-2.5-flash',
         messages: [
           { role: 'system', content: 'You generate structured JSON configurations for AI agents based on the provided description.' },
           { role: 'user', content: systemInstruction }
@@ -168,7 +168,7 @@ ${prompt}`
 
     if (!response.ok) {
       const errorData = await response.json()
-      return NextResponse.json({ error: errorData.error?.message || 'Groq AI request failed' }, { status: response.status })
+      return NextResponse.json({ error: errorData.error?.message || 'Gemini AI request failed' }, { status: response.status })
     }
 
     const data = await response.json()
@@ -188,7 +188,7 @@ ${prompt}`
         systemPrompt: buildIdentityPrompt(agentName, finalDomain, prompt, config.tone)
       })
     } catch {
-      return NextResponse.json({ error: 'Failed to parse Groq AI response' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to parse Gemini AI response' }, { status: 500 })
     }
 
   } catch (error: unknown) {

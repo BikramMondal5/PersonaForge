@@ -6,8 +6,8 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { readFileTool } from "./readFileTool.js";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 const DOMAIN_KEYWORDS = [
     { domain: "Women's Health", keywords: ["gynecolog", "obgyn", "ob-gyn", "obstetric", "pregnan", "menstrual", "fertility", "reproductive"] },
@@ -43,13 +43,13 @@ function safeErrorMessage(error) {
     return error instanceof Error ? error.message : String(error);
 }
 
-function createGroqModel(temperature = 0.7) {
+function createGeminiModel(temperature = 0.7) {
     return new ChatOpenAI({
-        model: GROQ_MODEL,
+        model: GEMINI_MODEL,
         temperature,
-        apiKey: process.env.GROQ_API_KEY,
+        apiKey: process.env.GEMINI_API_KEY,
         configuration: {
-            baseURL: GROQ_BASE_URL,
+            baseURL: GEMINI_BASE_URL,
         },
     });
 }
@@ -95,7 +95,7 @@ export function buildIdentityPrompt(agentName, domain, description, tone) {
  * Function 1 — forgePersona
  */
 export async function forgePersona(description, tone, guardrails) {
-    const model = createGroqModel(0.7);
+    const model = createGeminiModel(0.7);
 
     const extractedDomain = extractDomainFromText(description);
 
@@ -139,7 +139,7 @@ Return: {{ "name": "...", "systemPrompt": "...", "domain": "...", "sampleReply":
             sampleReply: parsed.sampleReply
         };
     } catch {
-        console.error("Failed to parse JSON from Groq response.");
+        console.error("Failed to parse JSON from Gemini response.");
         throw new Error("Invalid format returned by the model during persona creation.");
     }
 }
@@ -148,7 +148,7 @@ Return: {{ "name": "...", "systemPrompt": "...", "domain": "...", "sampleReply":
  * Function 2 — chatWithPersona
  */
 export async function chatWithPersona(systemPrompt, history, userMessage, enabledTools = []) {
-    const model = createGroqModel(0.7);
+    const model = createGeminiModel(0.7);
 
     const hasReadFileTool = Array.isArray(enabledTools) && enabledTools.includes("Read File");
 
@@ -202,7 +202,7 @@ export async function chatWithPersona(systemPrompt, history, userMessage, enable
  * Function 3 — judgeMessage
  */
 export async function judgeMessage(message, context) {
-    const model = createGroqModel(0);
+    const model = createGeminiModel(0);
 
     const promptText = `Is this message safe and on-topic for a {context} AI agent?
 Message: {message}
