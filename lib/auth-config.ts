@@ -135,10 +135,11 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub!
-        session.user.plan = (token.plan as string) || "starter"
-        session.user.isVerified = (token.isVerified as boolean) || true
-        session.user.agentsCreated = (token.agentsCreated as number) || 0
+        const u = session.user as any;
+        u.id = token.sub!
+        u.plan = (token.plan as string) || "starter"
+        u.isVerified = (token.isVerified as boolean) || true
+        u.agentsCreated = (token.agentsCreated as number) || 0
       }
       return session
     }
