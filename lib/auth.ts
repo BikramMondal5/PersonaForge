@@ -1,10 +1,26 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET!
+function getJwtSecret() {
+  const jwtSecret = process.env.JWT_SECRET
 
-if (!JWT_SECRET) {
-  throw new Error('Please define the JWT_SECRET environment variable inside .env.local')
+  if (!jwtSecret) {
+    throw new Error('Please define the JWT_SECRET environment variable')
+  }
+
+  return jwtSecret
+}
+
+function getVerificationSecrets() {
+  const secrets = [process.env.JWT_SECRET, process.env.NEXTAUTH_SECRET].filter(
+    (secret): secret is string => Boolean(secret)
+  )
+
+  if (secrets.length === 0) {
+    throw new Error('Please define the JWT_SECRET or NEXTAUTH_SECRET environment variable')
+  }
+
+  return secrets
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -17,24 +33,21 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 }
 
 export function generateToken(payload: object): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string): any {
-  try {
-    return jwt.verify(token, JWT_SECRET)
-  } catch (error) {
+  const secrets = getVerificationSecrets()
+
+  for (const secret of secrets) {
     try {
-      // Try with NextAuth secret as fallback
-      const nextAuthSecret = process.env.NEXTAUTH_SECRET
-      if (nextAuthSecret) {
-        return jwt.verify(token, nextAuthSecret)
-      }
-      throw error
-    } catch (e) {
-      throw new Error('Invalid token')
+      return jwt.verify(token, secret)
+    } catch {
+      // Try the next configured secret before rejecting the token.
     }
   }
+
+  throw new Error('Invalid token')
 }
 
 export interface JWTPayload {
