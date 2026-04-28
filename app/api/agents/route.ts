@@ -42,33 +42,42 @@ function isValidationError(error: unknown): error is { name: string; errors?: Re
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'ValidationError'
 }
 
+async function getAuthenticatedUserId(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1]
+
+    try {
+      const decoded = verifyToken(token)
+      return decoded.userId
+    } catch (error) {
+      console.warn('Ignoring invalid bearer token and checking session auth:', error)
+    }
+  }
+
+  // Fallback to session
+  const { getToken } = await import('next-auth/jwt')
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET
+  })
+
+  return typeof token?.userId === 'string' ? token.userId : null
+}
+
 // Get user's agents
 export async function GET(request: NextRequest) {
   try {
     await connectDB()
 
-    const authHeader = request.headers.get('authorization')
-    let userId: string
+    const userId = await getAuthenticatedUserId(request)
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1]
-      const decoded = verifyToken(token)
-      userId = decoded.userId
-    } else {
-      // Fallback to session
-      const { getToken } = await import('next-auth/jwt')
-      const token = await getToken({ 
-        req: request,
-        secret: process.env.NEXTAUTH_SECRET 
-      })
-
-      if (!token || !token.userId) {
-        return NextResponse.json(
-          { error: 'Authorization required' },
-          { status: 401 }
-        )
-      }
-      userId = token.userId as string
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authorization required' },
+        { status: 401 }
+      )
     }
 
     const agents = await Agent.find({ userId })
@@ -91,28 +100,13 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB()
 
-    const authHeader = request.headers.get('authorization')
-    let userId: string
+    const userId = await getAuthenticatedUserId(request)
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1]
-      const decoded = verifyToken(token)
-      userId = decoded.userId
-    } else {
-      // Fallback to session
-      const { getToken } = await import('next-auth/jwt')
-      const token = await getToken({ 
-        req: request,
-        secret: process.env.NEXTAUTH_SECRET 
-      })
-
-      if (!token || !token.userId) {
-        return NextResponse.json(
-          { error: 'Authorization required' },
-          { status: 401 }
-        )
-      }
-      userId = token.userId as string
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authorization required' },
+        { status: 401 }
+      )
     }
 
     const {
