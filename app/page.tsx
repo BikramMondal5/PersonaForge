@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
+import { useAuth } from "@/contexts/AuthContext"
 import {
   Menu,
   X,
@@ -113,6 +115,8 @@ Card.displayName = "Card"
 
 // Main Component
 function PersonaForgeLanding() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [email, setEmail] = useState("")
@@ -143,6 +147,12 @@ function PersonaForgeLanding() {
       })
       setIsGenerating(false)
     }, 2000)
+  }
+
+  const handleStartBuilding = () => {
+    if (authLoading) return
+
+    router.push(user ? "/dashboard" : "/login")
   }
 
   const features = [
@@ -254,7 +264,9 @@ function PersonaForgeLanding() {
               <a href="/login">
                 <Button variant="outline" size="sm">Login</Button>
               </a>
-              <Button size="sm">Start Building</Button>
+              <Button size="sm" onClick={handleStartBuilding} disabled={authLoading}>
+                Start Building
+              </Button>
             </div>
 
             {/* Mobile menu button */}
@@ -282,8 +294,12 @@ function PersonaForgeLanding() {
                 <a href="#demo" className="block font-bold py-2">Demo</a>
                 <a href="#pricing" className="block font-bold py-2">Pricing</a>
                 <div className="pt-4 space-y-2">
-                  <Button variant="outline" className="w-full">Login</Button>
-                  <Button className="w-full">Start Building</Button>
+                  <Button variant="outline" className="w-full" onClick={() => router.push("/login")}>
+                    Login
+                  </Button>
+                  <Button className="w-full" onClick={handleStartBuilding} disabled={authLoading}>
+                    Start Building
+                  </Button>
                 </div>
               </div>
             </motion.div>
@@ -308,7 +324,7 @@ function PersonaForgeLanding() {
               Describe your AI assistant in plain English. PersonaForge instantly generates the prompts, guardrails, memory configuration, and deployment pipeline.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg">
+              <Button size="lg" onClick={handleStartBuilding} disabled={authLoading}>
                 Start Building Agent
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
@@ -574,7 +590,12 @@ function PersonaForgeLanding() {
                       </li>
                     ))}
                   </ul>
-                  <Button variant="outline" className={cn("w-full", plan.highlight && "bg-[#FFF4E2] hover:bg-gray-50 text-[#0A0A0A]")}>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full", plan.highlight && "bg-[#FFF4E2] hover:bg-gray-50 text-[#0A0A0A]")}
+                    onClick={handleStartBuilding}
+                    disabled={authLoading}
+                  >
                     Get Started
                   </Button>
                 </Card>
@@ -732,7 +753,13 @@ function PersonaForgeLanding() {
             <p className="text-xl lg:text-2xl mb-8 font-bold text-white">
               No coding required. Just describe your agent.
             </p>
-            <Button size="lg" variant="outline" className="bg-[#FFF4E2] hover:bg-gray-50">
+            <Button
+              size="lg"
+              variant="outline"
+              className="bg-[#FFF4E2] hover:bg-gray-50"
+              onClick={handleStartBuilding}
+              disabled={authLoading}
+            >
               Start Building Now
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
