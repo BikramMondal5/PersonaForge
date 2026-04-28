@@ -23,7 +23,9 @@ import {
   X,
   Upload,
   Plus,
-  FileText
+  FileText,
+  Check,
+  Copy
 } from "lucide-react"
 
 function cn(...classes: (string | undefined | null | boolean)[]): string {
@@ -97,6 +99,63 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 )
 Card.displayName = "Card"
 
+// CodeBlock Component with Copy Functionality
+interface CodeBlockProps {
+  code: string
+  language: string
+  title: string
+}
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ code, language, title }) => {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  return (
+    <div className="bg-[#1a1a1a] rounded-xl border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+      <div className="flex justify-between items-center px-4 py-3 bg-[#2d2d2d] border-b-[2px] border-black">
+        <div className="text-xs font-bold text-gray-300 uppercase tracking-wide">{title}</div>
+        <button
+          onClick={handleCopy}
+          disabled={copied}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg border-[2px] transition-all duration-200",
+            copied
+              ? "bg-[#86EFAC] text-black border-black"
+              : "bg-[#3d3d3d] text-white border-gray-600 hover:bg-[#4d4d4d] hover:border-gray-500"
+          )}
+          aria-label={copied ? "Copied to clipboard" : "Copy code to clipboard"}
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="p-4 overflow-x-auto">
+        <pre className="font-mono text-sm text-gray-100 leading-relaxed">
+          <code className={`language-${language}`}>{code}</code>
+        </pre>
+      </div>
+    </div>
+  )
+}
+
 interface Message {
   id: number
   type: "user" | "ai"
@@ -133,6 +192,7 @@ export default function SandboxPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [savedAgents, setSavedAgents] = useState<any[]>([])
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [isLoadingAgentId, setIsLoadingAgentId] = useState(false)
 
   const [config, setConfig] = useState({
     name: "New Agent",
@@ -232,6 +292,7 @@ export default function SandboxPage() {
   // Forge agent when config changes
   useEffect(() => {
     const initAgent = async () => {
+      setIsLoadingAgentId(true)
       setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "info", message: "Registering agent...", timestamp: new Date().toLocaleTimeString() }])
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/register`, {
@@ -251,10 +312,14 @@ export default function SandboxPage() {
           setAgentId(data.agentId)
           setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "success", message: "Agent registered successfully", timestamp: new Date().toLocaleTimeString() }])
         } else {
+          setAgentId(null)
           setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "warning", message: data.error || "Failed to register agent", timestamp: new Date().toLocaleTimeString() }])
         }
       } catch (e) {
+        setAgentId(null)
         setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "warning", message: "Failed to connect to backend", timestamp: new Date().toLocaleTimeString() }])
+      } finally {
+        setIsLoadingAgentId(false)
       }
     }
     initAgent()
@@ -574,7 +639,11 @@ export default function SandboxPage() {
             </div>
           )}
 
-          <Button onClick={() => setIsDeployModalOpen(true)}>
+          <Button 
+            onClick={() => setIsDeployModalOpen(true)}
+            disabled={isLoadingAgentId || !agentId}
+            title={!agentId ? "Agent ID is loading or unavailable" : "Get API Keys"}
+          >
             <Rocket className="w-4 h-4 mr-2" />
             Get API
           </Button>
@@ -1034,7 +1103,7 @@ export default function SandboxPage() {
 
       {/* Deploy Modal */}
       <AnimatePresence>
-        {isDeployModalOpen && (
+        {isDeployModalOpen && agentId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1059,7 +1128,7 @@ export default function SandboxPage() {
                   <h3 className="font-bold mb-2">Agent ID</h3>
                   <div className="bg-white p-4 border-[3px] border-black rounded-lg hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-shadow">
                     <div className="text-xs text-gray-500 font-bold mb-1">AGENT ID</div>
-                    <div className="font-mono text-sm break-all">{agentId || "Loading..."}</div>
+                    <div className="font-mono text-sm break-all">{agentId}</div>
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
                     Use this Agent ID to invoke your agent via API
@@ -1077,45 +1146,12 @@ export default function SandboxPage() {
                 </div>
 
                 <div>
-                  <h3 className="font-bold mb-2">Integration Methods</h3>
+                  <h3 className="font-bold mb-4">Integration Methods</h3>
 
-                  {/* cURL Request - Commented out for now */}
-                  {/* <div className="bg-[#1e1e1e] text-white p-4 rounded-lg border-[3px] border-black overflow-x-auto relative mt-2 group">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-gray-400">cURL Request</div>
-                      <button
-                        onClick={() => {
-                          const code = `curl -X POST ${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer <API-Token>" \\
-  -d '{
-    "message": "Hello there!",
-    "session_id": "user-session-123"
-  }'`;
-                          navigator.clipboard.writeText(code);
-                        }}
-                        className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded border border-gray-600 transition-colors"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <pre className="font-mono text-sm whitespace-pre-wrap">
-                      {`curl -X POST ${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
-                      -H "Content-Type: application/json" \\
-                      -H "Authorization: Bearer <API-Token>" \\
-                        -d '{
-                          "message": "Hello there!",
-                        "session_id": "user-session-123"
-  }'`}
-                    </pre>
-                  </div> */}
-
-                  <div className="bg-white p-4 rounded-lg border-[3px] border-black overflow-x-auto relative group">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-gray-500 font-bold">JavaScript / TypeScript Fetch</div>
-                      <button
-                        onClick={() => {
-                          const code = `const response = await fetch("${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
+                  <CodeBlock
+                    title="JavaScript / TypeScript"
+                    language="javascript"
+                    code={`const response = await fetch("${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId}/chat", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -1127,30 +1163,8 @@ export default function SandboxPage() {
   })
 });
 const data = await response.json();
-console.log(data.message);`;
-                          navigator.clipboard.writeText(code);
-                        }}
-                        className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded border-[2px] border-black transition-colors font-bold"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <pre className="font-mono text-sm whitespace-pre-wrap text-black">
-                      {`const response = await fetch("${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
-                        method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      "Authorization": "Bearer <API-Token>"
-  },
-                        body: JSON.stringify({
-                          message: "Hello there!",
-                        session_id: "user-session-123"
-  })
-});
-                        const data = await response.json();
 console.log(data.message);`}
-                    </pre>
-                  </div>
+                  />
                 </div>
               </div>
             </motion.div>
