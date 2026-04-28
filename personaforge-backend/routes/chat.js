@@ -2,9 +2,10 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { agentsDb } from './forge.js';
 import { getHistory, saveHistory } from '../services/memory.js';
-import { buildSystemPrompt, buildStructuredPrompt } from '../services/promptBuilder.js';
-import { chatWithPersona, buildIdentityPrompt } from '../services/ai.js';
+import { buildStructuredPrompt } from '../services/promptBuilder.js';
+import { chatWithPersona } from '../services/ai.js';
 import { authenticateApiKey } from '../middleware/auth.js';
+import { getAgentById } from '../services/agentStore.js';
 
 const router = Router();
 
@@ -88,6 +89,92 @@ function normalizeAttachedFiles(files) {
         }));
 }
 
+async function loadAgentRecord(agentId) {
+    const localAgent = agentsDb.get(agentId);
+    if (localAgent) {
+        return localAgent;
+    }
+
+    return getAgentById(agentId);
+}
+
+function assertAgentIdentity(agent, agentId) {
+    const domain = typeof agent?.domain === "string" ? agent.domain.trim() : "";
+    const systemPrompt = typeof agent?.systemPrompt === "string" ? agent.systemPrompt.trim() : "";
+
+    if (!systemPrompt) {
+        throw new Error("Agent systemPrompt is missing");
+    }
+
+    if (!domain || domain === "General Knowledge") {
+        throw new Error("Agent domain is missing or invalid");
+    }
+
+    return { domain, systemPrompt };
+}
+
+function hasDomainMention(response, domain) {
+    if (!domain) return false;
+    const domainLower = domain.toLowerCase();
+    return response.toLowerCase().includes(domainLower);
+}
+
+async function handleAgentRequest(agentId, message, sessionId, attachedFiles) {
+    const agent = await loadAgentRecord(agentId);
+    if (!agent) {
+        return { status: 404, payload: { error: "Agent not found" } };
+    }
+
+    const enabledTools = Array.isArray(agent.tools) ? agent.tools : [];
+    const canReadFiles = enabledTools.includes("Read File");
+
+    const { domain, systemPrompt } = assertAgentIdentity(agent, agentId);
+
+    if (isFileRelatedMessage(message) && !canReadFiles) {
+        return {
+            status: 200,
+            payload: {
+                message: "I cannot inspect files for this agent because the Read File tool is not enabled. Enable Read File in the agent tools, then upload the file again.",
+                blocked: false,
+                session_id: sessionId,
+                tool_required: "Read File"
+            }
+        };
+    }
+
+    const history = await getHistory(sessionId);
+    let structuredMessage = buildStructuredPrompt(message, domain);
+
+    if (canReadFiles && attachedFiles.length > 0) {
+        const fileContext = attachedFiles
+            .map(file => `- ${file.file_name}: ${file.file_path}${file.size_bytes !== null ? ` (${file.size_bytes} bytes)` : ""}`)
+            .join("\n");
+        structuredMessage += `\n\nUploaded files available to this session:\n${fileContext}\nIf the user refers to "the file", "this file", an uploaded file, or asks to read/analyze/summarize file content, call read_file with the matching file_path before answering.`;
+    }
+
+    let reply = await chatWithPersona(systemPrompt, history, structuredMessage, enabledTools);
+
+    if (detectGenericResponse(reply, domain) || !hasDomainMention(reply, domain)) {
+        const regenPrompt = `${systemPrompt}\n\nRespond ONLY as a ${domain} specialist. Remove all generic assistant language. If a query is outside your domain, politely refuse and redirect to ${domain}.`;
+        reply = await chatWithPersona(regenPrompt, history, structuredMessage, enabledTools);
+    }
+
+    if (!hasDomainMention(reply, domain)) {
+        return {
+            status: 422,
+            payload: {
+                error: "Response failed domain validation",
+                blocked: true,
+                session_id: sessionId
+            }
+        };
+    }
+
+    await saveHistory(sessionId, message, reply);
+
+    return { status: 200, payload: { message: reply, blocked: false, session_id: sessionId } };
+}
+
 router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res) => {
     try {
         const { agentId } = req.params;
@@ -98,28 +185,7 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
             return res.status(400).json({ error: "message and session_id are required" });
         }
 
-        const agent = agentsDb.get(agentId);
-        if (!agent) {
-            return res.status(404).json({ error: "Agent not found" });
-        }
-
-        const enabledTools = Array.isArray(agent.tools) ? agent.tools : [];
-        const canReadFiles = enabledTools.includes("Read File");
-        const responseLength = agent.responseLength || 'medium';
-
-        if (isFileRelatedMessage(message) && !canReadFiles) {
-            return res.json({
-                message: "I cannot inspect files for this agent because the Read File tool is not enabled. Enable Read File in the agent tools, then upload the file again.",
-                blocked: false,
-                session_id,
-                tool_required: "Read File"
-            });
-        }
-
-        // 1. Get Memory
-        const history = await getHistory(session_id);
-
-        // 2. Quick keyword-based safety check only (skip AI-based input guardrail for speed)
+        // 1. Quick keyword-based safety check only (skip AI-based input guardrail for speed)
         const lowerMessage = message.toLowerCase();
         const dangerousKeywords = ["hack", "bomb", "weapon", "illegal", "jailbreak", "ignore all rules", "forget instructions"];
         const hasDangerousContent = dangerousKeywords.some(keyword => lowerMessage.includes(keyword));
@@ -132,40 +198,18 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
             });
         }
 
-        // 3. Build system prompt and structure user input
-        const fullSystemPrompt = buildSystemPrompt(agent.systemPrompt, agent.domain, agent.guardrails, enabledTools, responseLength);
-
-        let structuredMessage = buildStructuredPrompt(message, agent.domain);
-
-        if (canReadFiles && attachedFiles.length > 0) {
-            const fileContext = attachedFiles
-                .map(file => `- ${file.file_name}: ${file.file_path}${file.size_bytes !== null ? ` (${file.size_bytes} bytes)` : ""}`)
-                .join("\n");
-            structuredMessage += `\n\nUploaded files available to this session:\n${fileContext}\nIf the user refers to "the file", "this file", an uploaded file, or asks to read/analyze/summarize file content, call read_file with the matching file_path before answering.`;
-        }
-
-        console.log({
-            agentName: agent.name,
-            domain: agent.domain,
-            systemPrompt: fullSystemPrompt
-        });
-
-        // 4. Get AI response (single call + validation retry)
-        let reply = await chatWithPersona(fullSystemPrompt, history, structuredMessage, enabledTools);
-
-        if (detectGenericResponse(reply, agent.domain)) {
-            const regenPrompt = `${fullSystemPrompt}\n\nRespond ONLY within ${agent.domain}. Remove all generic assistant language. If a query is outside your domain, politely refuse and redirect to ${agent.domain}.`;
-            reply = await chatWithPersona(regenPrompt, history, structuredMessage, enabledTools);
-        }
-
-        // 5. Save History
-        await saveHistory(session_id, message, reply);
-
-        // 6. Return response
-        return res.json({ message: reply, blocked: false, session_id });
+        // 2. Single pipeline for all requests
+        const result = await handleAgentRequest(agentId, message, session_id, attachedFiles);
+        return res.status(result.status).json(result.payload);
 
     } catch (error) {
-        console.error("Error in /chat:", safeErrorMessage(error));
+        const errorMessage = safeErrorMessage(error);
+        console.error("Error in /chat:", errorMessage);
+
+        if (errorMessage.includes('systemPrompt') || errorMessage.includes('domain')) {
+            return res.status(400).json({ error: errorMessage });
+        }
+
         return res.status(500).json({ error: "Internal server error during chat" });
     }
 });
@@ -175,21 +219,23 @@ router.post('/register', authenticateApiKeyOrLocalSandbox, async (req, res) => {
         const { name, systemPrompt, domain, guardrails, tools, responseLength } = req.body || {};
 
         const trimmedDomain = typeof domain === "string" ? domain.trim() : "";
+        const trimmedSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
         if (!trimmedDomain) {
             return res.status(400).json({ error: "domain is required" });
         }
 
+        if (!trimmedSystemPrompt) {
+            return res.status(400).json({ error: "systemPrompt is required" });
+        }
+
         const agentName = typeof name === "string" && name.trim() ? name.trim() : `${trimmedDomain} Specialist`;
-        const agentSystemPrompt = typeof systemPrompt === "string" && systemPrompt.trim()
-            ? systemPrompt.trim()
-            : buildIdentityPrompt(agentName, trimmedDomain, "Provide domain-specific guidance.");
 
         const agentId = crypto.randomUUID();
 
         const agentRecord = {
             agentId,
             name: agentName,
-            systemPrompt: agentSystemPrompt,
+            systemPrompt: trimmedSystemPrompt,
             domain: trimmedDomain,
             guardrails: Array.isArray(guardrails) ? guardrails : [],
             tools: Array.isArray(tools) ? tools : [],
