@@ -41,7 +41,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           await connectDB()
-          
+
           const user = await User.findOne({ email: credentials.email })
           if (!user) {
             return null
@@ -77,10 +77,10 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "google" || account?.provider === "github") {
         try {
           await connectDB()
-          
+
           // Check if user already exists in our custom User model
           let existingUser = await User.findOne({ email: user.email })
-          
+
           if (!existingUser) {
             // Create new user for OAuth
             existingUser = await User.create({
@@ -125,9 +125,10 @@ export const authOptions: NextAuthOptions = {
           }
         } else {
           // For credentials provider
-          token.plan = user.plan
-          token.isVerified = user.isVerified
-          token.agentsCreated = user.agentsCreated
+          const u = user as any;
+          token.plan = u.plan
+          token.isVerified = u.isVerified
+          token.agentsCreated = u.agentsCreated
         }
       }
       return token
