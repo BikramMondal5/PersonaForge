@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { agentsDb } from './forge.js';
 import { getHistory, saveHistory } from '../services/memory.js';
 import { buildSystemPrompt, buildStructuredPrompt } from '../services/promptBuilder.js';
-import { chatWithPersona } from '../services/ai.js';
+import { chatWithPersona, buildIdentityPrompt } from '../services/ai.js';
 import { authenticateApiKey } from '../middleware/auth.js';
 
 const router = Router();
@@ -44,17 +45,20 @@ function detectGenericResponse(response, domain) {
         /^(sure|of course|certainly)[!,.]?\s+i('d| would) be (happy|glad) to help/i,
         /as an ai (assistant|language model)/i,
         /i don't have personal (opinions|feelings|experiences)/i,
+        /wide range of topics/i,
+        /help with anything/i,
+        /general knowledge/i,
     ];
 
     const lowerResponse = response.toLowerCase();
-    
+
     // Check for generic patterns
     for (const pattern of genericPatterns) {
         if (pattern.test(response)) {
             return true;
         }
     }
-    
+
     // Check if domain is mentioned at all in first 100 chars (should be for greetings)
     if (domain && response.length < 200) {
         const domainLower = domain.toLowerCase();
@@ -64,7 +68,7 @@ function detectGenericResponse(response, domain) {
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -119,18 +123,18 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
         const lowerMessage = message.toLowerCase();
         const dangerousKeywords = ["hack", "bomb", "weapon", "illegal", "jailbreak", "ignore all rules", "forget instructions"];
         const hasDangerousContent = dangerousKeywords.some(keyword => lowerMessage.includes(keyword));
-        
+
         if (hasDangerousContent) {
-            return res.json({ 
-                message: "I can't help with that request.", 
-                blocked: true, 
-                session_id 
+            return res.json({
+                message: "I can't help with that request.",
+                blocked: true,
+                session_id
             });
         }
 
         // 3. Build system prompt and structure user input
         const fullSystemPrompt = buildSystemPrompt(agent.systemPrompt, agent.domain, agent.guardrails, enabledTools, responseLength);
-        
+
         let structuredMessage = buildStructuredPrompt(message, agent.domain);
 
         if (canReadFiles && attachedFiles.length > 0) {
@@ -140,8 +144,19 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
             structuredMessage += `\n\nUploaded files available to this session:\n${fileContext}\nIf the user refers to "the file", "this file", an uploaded file, or asks to read/analyze/summarize file content, call read_file with the matching file_path before answering.`;
         }
 
-        // 4. Get AI response (single call, no validation loops)
-        const reply = await chatWithPersona(fullSystemPrompt, history, structuredMessage, enabledTools);
+        console.log({
+            agentName: agent.name,
+            domain: agent.domain,
+            systemPrompt: fullSystemPrompt
+        });
+
+        // 4. Get AI response (single call + validation retry)
+        let reply = await chatWithPersona(fullSystemPrompt, history, structuredMessage, enabledTools);
+
+        if (detectGenericResponse(reply, agent.domain)) {
+            const regenPrompt = `${fullSystemPrompt}\n\nRespond ONLY within ${agent.domain}. Remove all generic assistant language. If a query is outside your domain, politely refuse and redirect to ${agent.domain}.`;
+            reply = await chatWithPersona(regenPrompt, history, structuredMessage, enabledTools);
+        }
 
         // 5. Save History
         await saveHistory(session_id, message, reply);
@@ -152,6 +167,41 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
     } catch (error) {
         console.error("Error in /chat:", safeErrorMessage(error));
         return res.status(500).json({ error: "Internal server error during chat" });
+    }
+});
+
+router.post('/register', authenticateApiKeyOrLocalSandbox, async (req, res) => {
+    try {
+        const { name, systemPrompt, domain, guardrails, tools, responseLength } = req.body || {};
+
+        const trimmedDomain = typeof domain === "string" ? domain.trim() : "";
+        if (!trimmedDomain) {
+            return res.status(400).json({ error: "domain is required" });
+        }
+
+        const agentName = typeof name === "string" && name.trim() ? name.trim() : `${trimmedDomain} Specialist`;
+        const agentSystemPrompt = typeof systemPrompt === "string" && systemPrompt.trim()
+            ? systemPrompt.trim()
+            : buildIdentityPrompt(agentName, trimmedDomain, "Provide domain-specific guidance.");
+
+        const agentId = crypto.randomUUID();
+
+        const agentRecord = {
+            agentId,
+            name: agentName,
+            systemPrompt: agentSystemPrompt,
+            domain: trimmedDomain,
+            guardrails: Array.isArray(guardrails) ? guardrails : [],
+            tools: Array.isArray(tools) ? tools : [],
+            responseLength: responseLength || 'medium'
+        };
+
+        agentsDb.set(agentId, agentRecord);
+
+        return res.status(201).json(agentRecord);
+    } catch (error) {
+        console.error("Error in /register:", safeErrorMessage(error));
+        return res.status(500).json({ error: "Internal server error during agent registration" });
     }
 });
 

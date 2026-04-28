@@ -38,19 +38,19 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
     const baseStyles = "inline-flex items-center justify-center font-bold rounded-lg transition-all duration-200 border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-    
+
     const variants = {
       default: "bg-[#FF7A00] text-white hover:bg-[#E66D00]",
       outline: "bg-[#FFF4E2] text-black hover:bg-gray-50",
       ghost: "bg-transparent border-transparent shadow-none hover:bg-gray-100 hover:shadow-none"
     }
-    
+
     const sizes = {
       default: "px-6 py-3 text-base",
       sm: "px-4 py-2 text-sm",
       lg: "px-8 py-4 text-lg"
     }
-    
+
     return (
       <button
         ref={ref}
@@ -63,7 +63,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button"
 
 // Input Component
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> { }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, ...props }, ref) => {
@@ -109,7 +109,7 @@ export default function DashboardPage() {
   // Calculate global stats from real data
   const totalApiCalls = agents.reduce((sum, a) => sum + (a.totalApiCalls || 0), 0)
   const totalSandboxTests = agents.reduce((sum, a) => sum + (a.testCount || 0), 0)
-  
+
   const { user, token, logout, loading } = useAuth()
   const router = useRouter()
 
@@ -146,7 +146,7 @@ export default function DashboardPage() {
       id: agent._id || agent.id,
       name: agent.name,
       tone: agent.tone || "Friendly",
-      expertise: agent.domain || "General",
+      expertise: agent.domain || "Unspecified Domain",
       description: agent.systemPrompt || agent.description,
       guardrails: agent.guardrails || ["stayOnTopic", "noHarmfulContent"],
       tools: agent.tools || []
@@ -342,7 +342,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card 
+              <Card
                 className="hover:translate-y-[-4px] transition-transform bg-[#5CC8FF] cursor-pointer"
                 onClick={() => router.push('/create-agent')}
               >
@@ -357,7 +357,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card 
+              <Card
                 className="hover:translate-y-[-4px] transition-transform bg-[#86EFAC] cursor-pointer"
                 onClick={() => router.push('/sandbox')}
               >

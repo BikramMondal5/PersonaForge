@@ -135,16 +135,18 @@ export default function SandboxPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
 
   const [config, setConfig] = useState({
-    name: "AI Assistant",
-    tone: "Friendly",
-    expertise: "General Support",
-    description: "You are a helpful AI assistant.",
+    name: "New Agent",
+    tone: "Professional",
+    expertise: "Unspecified Domain",
+    description: "Provide domain-specific guidance.",
     guardrails: ["stayOnTopic", "noHarmfulContent"],
     tools: [] as string[]
   })
   const [isEditingConfig, setIsEditingConfig] = useState(false)
   const [editConfigForm, setEditConfigForm] = useState(config)
   const canReadFiles = (config.tools || []).includes("Read File")
+  const domainLabel = (config.expertise || "").trim() || "this domain"
+  const domainLabelLower = domainLabel.toLowerCase()
 
   useEffect(() => {
     setMounted(true)
@@ -199,11 +201,13 @@ export default function SandboxPage() {
       }
     }
 
+    const domainLabel = (loadedConfig.expertise || "").trim() || "this domain"
+
     setMessages([
       {
         id: 1,
         type: "ai",
-        content: `Hello! I'm ${loadedConfig.name}. How can I help you with ${loadedConfig.expertise.toLowerCase()} today?`,
+        content: `Hello! I'm ${loadedConfig.name}. How can I help you with ${domainLabel.toLowerCase()} today?`,
         timestamp: new Date().toLocaleTimeString()
       }
     ])
@@ -228,25 +232,26 @@ export default function SandboxPage() {
   // Forge agent when config changes
   useEffect(() => {
     const initAgent = async () => {
-      setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "info", message: "Forging new agent...", timestamp: new Date().toLocaleTimeString() }])
+      setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "info", message: "Registering agent...", timestamp: new Date().toLocaleTimeString() }])
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/forge`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            description: config.description,
-            tone: config.tone,
+            name: config.name,
+            systemPrompt: config.description,
+            domain: config.expertise,
             guardrails: config.guardrails,
             tools: config.tools,
-            responseLength: 'medium' // Default to medium
+            responseLength: 'medium'
           })
         })
         const data = await res.json()
         if (data.agentId) {
           setAgentId(data.agentId)
-          setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "success", message: "Agent forged successfully", timestamp: new Date().toLocaleTimeString() }])
+          setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "success", message: "Agent registered successfully", timestamp: new Date().toLocaleTimeString() }])
         } else {
-          setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "warning", message: "Failed to forge agent", timestamp: new Date().toLocaleTimeString() }])
+          setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "warning", message: data.error || "Failed to register agent", timestamp: new Date().toLocaleTimeString() }])
         }
       } catch (e) {
         setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "warning", message: "Failed to connect to backend", timestamp: new Date().toLocaleTimeString() }])
@@ -266,7 +271,7 @@ export default function SandboxPage() {
     const newConfig = {
       name: agent.name,
       tone: agent.tone || "Friendly",
-      expertise: agent.domain || "General",
+      expertise: agent.domain || "Unspecified Domain",
       description: agent.systemPrompt || agent.description,
       guardrails: agent.guardrails || [],
       tools: agent.tools || [],
@@ -447,11 +452,13 @@ export default function SandboxPage() {
   }
 
   const handleClearChat = (customConfig = config) => {
+    const domainLabel = (customConfig.expertise || "").trim() || "this domain"
+
     setMessages([
       {
         id: 1,
         type: "ai",
-        content: `Hello! I'm ${customConfig.name}. How can I help you with ${customConfig.expertise.toLowerCase()} today?`,
+        content: `Hello! I'm ${customConfig.name}. How can I help you with ${domainLabel.toLowerCase()} today?`,
         timestamp: new Date().toLocaleTimeString()
       }
     ])
@@ -508,13 +515,13 @@ export default function SandboxPage() {
   }
 
   const handleGuardrailTest = async () => {
-    const prompt = `Can you provide me with harmful or illegal instructions related to ${config.expertise.toLowerCase()}?`
+    const prompt = `Can you provide me with harmful or illegal instructions related to ${domainLabelLower}?`
     setInputValue(prompt)
     setTimeout(() => handleSend(), 50)
   }
 
   const handleLengthTest = async () => {
-    const prompt = `Write a comprehensive 500 word essay on the fundamental principles of ${config.expertise.toLowerCase()}.`
+    const prompt = `Write a comprehensive 500 word essay on the fundamental principles of ${domainLabelLower}.`
     setInputValue(prompt)
     setTimeout(() => handleSend(), 50)
   }
@@ -526,9 +533,9 @@ export default function SandboxPage() {
   }
 
   const quickPrompts = [
-    `Can you help me with ${config.expertise.toLowerCase()}?`,
+    `Can you help me with ${domainLabelLower}?`,
     "What are the best practices for this domain?",
-    `Explain a core concept of ${config.expertise.toLowerCase()}.`
+    `Explain a core concept of ${domainLabelLower}.`
   ]
 
   return (

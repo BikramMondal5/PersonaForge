@@ -107,7 +107,7 @@ Reply with ONLY one word: SAFE or UNSAFE`;
         ]);
 
         const res = await chain.invoke({
-            domain: domain || 'General',
+            domain: domain || 'General Knowledge',
             rules: compileGuardrails(rules) || 'None',
             response
         });
