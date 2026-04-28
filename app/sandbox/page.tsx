@@ -1092,13 +1092,13 @@ export default function SandboxPage() {
                       </button>
                     </div>
                     <pre className="font-mono text-sm whitespace-pre-wrap">
-                      {\`curl -X POST \${process.env.NEXT_PUBLIC_API_URL}/v1/\${agentId || 'YOUR_AGENT_ID'}/chat \\
+                      {`curl -X POST ${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
                       -H "Content-Type: application/json" \\
                       -H "Authorization: Bearer <API-Token>" \\
                         -d '{
                           "message": "Hello there!",
                         "session_id": "user-session-123"
-  }'\`}
+  }'`}
                     </pre>
                   </div>
 
@@ -1128,7 +1128,7 @@ console.log(data.message);`;
                       </button>
                     </div>
                     <pre className="font-mono text-sm whitespace-pre-wrap text-black">
-                      {\`const response = await fetch("\${process.env.NEXT_PUBLIC_API_URL}/v1/\${agentId || 'YOUR_AGENT_ID'}/chat", {
+                      {`const response = await fetch("${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
                         method: "POST",
                       headers: {
                         "Content-Type": "application/json",
@@ -1140,7 +1140,7 @@ console.log(data.message);`;
   })
 });
                         const data = await response.json();
-console.log(data.message);\`}
+console.log(data.message);`}
                     </pre>
                   </div>
                 </div>
