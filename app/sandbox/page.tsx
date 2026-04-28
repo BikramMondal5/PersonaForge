@@ -188,7 +188,7 @@ export default function SandboxPage() {
         setConfig(newConfig)
         setEditConfigForm(newConfig)
         loadedConfig = newConfig
-        
+
         // Set selected agent if ID exists
         if (newConfig.id) {
           setSelectedAgentId(newConfig.id)
@@ -230,7 +230,7 @@ export default function SandboxPage() {
     const initAgent = async () => {
       setLogs(prev => [...prev, { id: Date.now() + Math.random(), type: "info", message: "Forging new agent...", timestamp: new Date().toLocaleTimeString() }])
       try {
-        const res = await fetch("http://localhost:8000/forge", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/forge`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -272,18 +272,18 @@ export default function SandboxPage() {
       tools: agent.tools || [],
       id: agent._id || agent.id
     }
-    
+
     setConfig(newConfig)
     setEditConfigForm(newConfig)
     setSelectedAgentId(agent._id || agent.id)
     setSessionId("session-" + Math.random().toString(36).substring(2, 9))
     handleClearChat(newConfig)
-    
-    setLogs(prev => [...prev, { 
-      id: Date.now() + Math.random(), 
-      type: "info", 
-      message: `Switched to agent: ${agent.name}`, 
-      timestamp: new Date().toLocaleTimeString() 
+
+    setLogs(prev => [...prev, {
+      id: Date.now() + Math.random(),
+      type: "info",
+      message: `Switched to agent: ${agent.name}`,
+      timestamp: new Date().toLocaleTimeString()
     }])
   }
 
@@ -348,7 +348,7 @@ export default function SandboxPage() {
         console.warn("Failed to fetch user SMTP for chat, falling back to global")
       }
 
-      const res = await fetch(`http://localhost:8000/v1/${agentId}/chat`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -413,7 +413,7 @@ export default function SandboxPage() {
         reader.readAsDataURL(file)
       })
 
-      const res = await fetch("http://localhost:8000/files/upload", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/files/upload`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -481,7 +481,7 @@ export default function SandboxPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/v1/${agentId}/chat`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: jailbreakPrompt, session_id: sessionId })
@@ -544,7 +544,7 @@ export default function SandboxPage() {
           </a>
           <h1 className="text-2xl font-black">Sandbox Testing</h1>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {/* Agent Selector Dropdown */}
           {savedAgents.length > 0 && (
@@ -566,7 +566,7 @@ export default function SandboxPage() {
               </select>
             </div>
           )}
-          
+
           <Button onClick={() => setIsDeployModalOpen(true)}>
             <Rocket className="w-4 h-4 mr-2" />
             Get API
@@ -1077,7 +1077,7 @@ export default function SandboxPage() {
                       <div className="text-xs text-gray-400">cURL Request</div>
                       <button
                         onClick={() => {
-                          const code = `curl -X POST http://localhost:8000/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
+                          const code = `curl -X POST ${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <API-Token>" \\
   -d '{
@@ -1092,13 +1092,13 @@ export default function SandboxPage() {
                       </button>
                     </div>
                     <pre className="font-mono text-sm whitespace-pre-wrap">
-                      {`curl -X POST http://localhost:8000/v1/${agentId || 'YOUR_AGENT_ID'}/chat \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer <API-Token>" \\
-  -d '{
-    "message": "Hello there!",
-    "session_id": "user-session-123"
-  }'`}
+                      {\`curl -X POST \${process.env.NEXT_PUBLIC_API_URL}/v1/\${agentId || 'YOUR_AGENT_ID'}/chat \\
+                      -H "Content-Type: application/json" \\
+                      -H "Authorization: Bearer <API-Token>" \\
+                        -d '{
+                          "message": "Hello there!",
+                        "session_id": "user-session-123"
+  }'\`}
                     </pre>
                   </div>
 
@@ -1107,7 +1107,7 @@ export default function SandboxPage() {
                       <div className="text-xs text-gray-500 font-bold">JavaScript / TypeScript Fetch</div>
                       <button
                         onClick={() => {
-                          const code = `const response = await fetch("http://localhost:8000/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
+                          const code = `const response = await fetch("${process.env.NEXT_PUBLIC_API_URL}/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -1128,19 +1128,19 @@ console.log(data.message);`;
                       </button>
                     </div>
                     <pre className="font-mono text-sm whitespace-pre-wrap text-black">
-                      {`const response = await fetch("http://localhost:8000/v1/${agentId || 'YOUR_AGENT_ID'}/chat", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer <API-Token>"
+                      {\`const response = await fetch("\${process.env.NEXT_PUBLIC_API_URL}/v1/\${agentId || 'YOUR_AGENT_ID'}/chat", {
+                        method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      "Authorization": "Bearer <API-Token>"
   },
-  body: JSON.stringify({
-    message: "Hello there!",
-    session_id: "user-session-123"
+                        body: JSON.stringify({
+                          message: "Hello there!",
+                        session_id: "user-session-123"
   })
 });
-const data = await response.json();
-console.log(data.message);`}
+                        const data = await response.json();
+console.log(data.message);\`}
                     </pre>
                   </div>
                 </div>
