@@ -7,6 +7,10 @@ const redis = process.env.REDIS_URL
     ? new Redis(process.env.REDIS_URL, { lazyConnect: true })
     : null;
 
+function safeErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 if (redis) {
     redis.on('error', (error) => {
         console.error("Redis connection error:", error.message);
@@ -26,7 +30,7 @@ export async function getHistory(sessionId) {
         if (!data) return [];
         return JSON.parse(data);
     } catch (e) {
-        console.error("Redis getHistory error:", e);
+        console.error("Redis getHistory error:", safeErrorMessage(e));
         return [];
     }
 }
@@ -55,6 +59,6 @@ export async function saveHistory(sessionId, userMessage, assistantReply) {
         await redis.set(key, JSON.stringify(history));
         await redis.expire(key, 3600); // 1 hour expiry
     } catch (e) {
-        console.error("Redis saveHistory error:", e);
+        console.error("Redis saveHistory error:", safeErrorMessage(e));
     }
 }

@@ -67,11 +67,7 @@ router.post('/upload', async (req, res) => {
         const absolutePath = path.join(SAFE_FILE_DIR, uniqueName);
         await fs.writeFile(absolutePath, fileBuffer);
 
-        console.log('[files] upload success', {
-            fileName,
-            storedFileName: uniqueName,
-            size_bytes: fileBuffer.length
-        });
+        console.log('[files] upload success', { size_bytes: fileBuffer.length });
 
         return res.status(201).json({
             ok: true,
@@ -79,7 +75,7 @@ router.post('/upload', async (req, res) => {
             size_bytes: fileBuffer.length
         });
     } catch (error) {
-        console.error('[files] upload failed', error);
+        console.error('[files] upload failed', error instanceof Error ? error.message : String(error));
         return res.status(500).json({ error: 'Failed to upload file.' });
     }
 });

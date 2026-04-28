@@ -6,6 +6,27 @@ import connectDB from "./mongodb"
 import User from "@/models/User"
 import { verifyPassword } from "./auth"
 
+type AuthUserFields = {
+  id?: string
+  plan?: string
+  isVerified?: boolean
+  agentsCreated?: number
+}
+
+type SessionUserFields = {
+  id?: string
+  plan?: string
+  isVerified?: boolean
+  agentsCreated?: number
+}
+
+function logAuthError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : "Error",
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -54,7 +75,7 @@ export const authOptions: NextAuthOptions = {
             agentsCreated: user.agentsCreated
           }
         } catch (error) {
-          console.error("Auth error:", error)
+          logAuthError("Auth error", error)
           return null
         }
       }
@@ -86,7 +107,7 @@ export const authOptions: NextAuthOptions = {
 
           return true
         } catch (error) {
-          console.error("OAuth sign in error:", error)
+          logAuthError("OAuth sign in error", error)
           // Still allow sign in even if our custom user creation fails
           return true
         }
@@ -112,16 +133,17 @@ export const authOptions: NextAuthOptions = {
               token.agentsCreated = 0
             }
           } catch (error) {
-            console.error("JWT callback error:", error)
+            logAuthError("JWT callback error", error)
             token.plan = "starter"
             token.isVerified = true
             token.agentsCreated = 0
           }
         } else {
           // For credentials provider
-          token.plan = (user as any).plan
-          token.isVerified = (user as any).isVerified
-          token.agentsCreated = (user as any).agentsCreated
+          const authUser = user as AuthUserFields
+          token.plan = authUser.plan
+          token.isVerified = authUser.isVerified
+          token.agentsCreated = authUser.agentsCreated
           token.userId = user.id
         }
       }
@@ -129,10 +151,11 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.userId as string || token.sub!;
-        (session.user as any).plan = (token.plan as string) || "starter";
-        (session.user as any).isVerified = (token.isVerified as boolean) || true;
-        (session.user as any).agentsCreated = (token.agentsCreated as number) || 0;
+        const sessionUser = session.user as typeof session.user & SessionUserFields
+        sessionUser.id = token.userId as string || token.sub!
+        sessionUser.plan = (token.plan as string) || "starter"
+        sessionUser.isVerified = (token.isVerified as boolean) || true
+        sessionUser.agentsCreated = (token.agentsCreated as number) || 0
       }
       return session
     }
@@ -145,5 +168,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt"
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development"
+  debug: false
 }

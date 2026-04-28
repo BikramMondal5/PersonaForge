@@ -7,6 +7,10 @@ import { authenticateApiKey } from '../middleware/auth.js';
 
 const router = Router();
 
+function safeErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 function isLocalRequest(req) {
     const origin = req.headers.origin || "";
     const remoteAddress = req.ip || req.socket?.remoteAddress || "";
@@ -146,7 +150,7 @@ router.post('/:agentId/chat', authenticateApiKeyOrLocalSandbox, async (req, res)
         return res.json({ message: reply, blocked: false, session_id });
 
     } catch (error) {
-        console.error("Error in /chat:", error);
+        console.error("Error in /chat:", safeErrorMessage(error));
         return res.status(500).json({ error: "Internal server error during chat" });
     }
 });

@@ -5,6 +5,13 @@ import { verifyToken } from '@/lib/auth'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth-config-simple"
 
+function logSettingsError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : 'Error',
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 /**
  * Common function to get userId from session or JWT
  */
@@ -24,8 +31,8 @@ async function getAuthenticatedUserId(request: NextRequest): Promise<string | nu
       if (decoded && decoded.userId) {
         return decoded.userId
       }
-    } catch (e: any) {
-      console.error("JWT Verification failed:", e.message)
+    } catch {
+      console.error("JWT Verification failed")
     }
   }
 
@@ -70,10 +77,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'SMTP settings updated successfully'
     })
-  } catch (error: any) {
-    console.error('Error updating SMTP settings:', error)
+  } catch (error: unknown) {
+    logSettingsError('Error updating SMTP settings', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }
@@ -102,8 +109,8 @@ export async function GET(request: NextRequest) {
         pass: ''
       }
     })
-  } catch (error: any) {
-    console.error('Error fetching SMTP settings:', error)
+  } catch (error: unknown) {
+    logSettingsError('Error fetching SMTP settings', error)
     // Fallback response to avoid hanging UI
     return NextResponse.json({
       success: true,

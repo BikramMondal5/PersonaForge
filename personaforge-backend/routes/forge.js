@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
 
         return res.status(201).json(agentRecord);
     } catch (error) {
-        console.error("Error in /forge:", error);
+        console.error("Error in /forge:", error instanceof Error ? error.message : String(error));
         return res.status(500).json({ error: "Internal server error during persona generation" });
     }
 });

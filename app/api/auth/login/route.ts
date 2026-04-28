@@ -3,6 +3,13 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { verifyPassword, generateToken } from '@/lib/auth'
 
+function logAuthRouteError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : 'Error',
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
@@ -61,8 +68,8 @@ export async function POST(request: NextRequest) {
       token
     }, { status: 200 })
 
-  } catch (error: any) {
-    console.error('Login error:', error)
+  } catch (error: unknown) {
+    logAuthRouteError('Login error', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

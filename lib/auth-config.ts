@@ -3,15 +3,35 @@ import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { MongoDBAdapter } from "@auth/mongodb-adapter"
-import { MongoClient } from "mongodb"
+import { MongoClient, ServerApiVersion } from "mongodb"
 import connectDB from "./mongodb"
 import User from "@/models/User"
 import { verifyPassword } from "./auth"
 
+type AuthUserFields = {
+  plan?: string
+  isVerified?: boolean
+  agentsCreated?: number
+}
+
+type SessionUserFields = {
+  id?: string
+  plan?: string
+  isVerified?: boolean
+  agentsCreated?: number
+}
+
+function logAuthError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : "Error",
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 // Create MongoDB client for NextAuth adapter
 const client = new MongoClient(process.env.MONGODB_URI!, {
   serverApi: {
-    version: '1' as any,
+    version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   }
@@ -66,7 +86,7 @@ export const authOptions: NextAuthOptions = {
             agentsCreated: user.agentsCreated
           }
         } catch (error) {
-          console.error("Auth error:", error)
+          logAuthError("Auth error", error)
           return null
         }
       }
@@ -98,7 +118,7 @@ export const authOptions: NextAuthOptions = {
 
           return true
         } catch (error) {
-          console.error("OAuth sign in error:", error)
+          logAuthError("OAuth sign in error", error)
           return true // Allow sign in even if our custom user creation fails
         }
       }
@@ -117,7 +137,7 @@ export const authOptions: NextAuthOptions = {
               token.agentsCreated = dbUser.agentsCreated
             }
           } catch (error) {
-            console.error("JWT callback error:", error)
+            logAuthError("JWT callback error", error)
             // Set defaults if database query fails
             token.plan = "starter"
             token.isVerified = true
@@ -125,21 +145,21 @@ export const authOptions: NextAuthOptions = {
           }
         } else {
           // For credentials provider
-          const u = user as any;
-          token.plan = u.plan
-          token.isVerified = u.isVerified
-          token.agentsCreated = u.agentsCreated
+          const authUser = user as AuthUserFields
+          token.plan = authUser.plan
+          token.isVerified = authUser.isVerified
+          token.agentsCreated = authUser.agentsCreated
         }
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        const u = session.user as any;
-        u.id = token.sub!
-        u.plan = (token.plan as string) || "starter"
-        u.isVerified = (token.isVerified as boolean) || true
-        u.agentsCreated = (token.agentsCreated as number) || 0
+        const sessionUser = session.user as typeof session.user & SessionUserFields
+        sessionUser.id = token.sub!
+        sessionUser.plan = (token.plan as string) || "starter"
+        sessionUser.isVerified = (token.isVerified as boolean) || true
+        sessionUser.agentsCreated = (token.agentsCreated as number) || 0
       }
       return session
     }
@@ -152,5 +172,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt"
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development"
+  debug: false
 }

@@ -4,6 +4,13 @@ import Agent from '@/models/Agent'
 import { verifyToken } from '@/lib/auth'
 import { getToken } from 'next-auth/jwt'
 
+function logRouteError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : 'Error',
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 async function getAuthenticatedUserId(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
 
@@ -71,8 +78,8 @@ export async function PATCH(
       agent
     })
 
-  } catch (error: any) {
-    console.error('Update agent error:', error)
+  } catch (error: unknown) {
+    logRouteError('Update agent error', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -110,8 +117,8 @@ export async function DELETE(
       message: 'Agent deleted successfully'
     })
 
-  } catch (error: any) {
-    console.error('Delete agent error:', error)
+  } catch (error: unknown) {
+    logRouteError('Delete agent error', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

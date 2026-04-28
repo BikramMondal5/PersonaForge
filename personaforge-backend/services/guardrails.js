@@ -8,6 +8,10 @@ import { RunnableSequence } from "@langchain/core/runnables";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
+function safeErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 function createGroqModel(temperature = 0) {
     return new ChatOpenAI({
         model: GROQ_MODEL,
@@ -50,7 +54,7 @@ async function claudeJudgeInput(message, domain) {
         }
         return { safe: true };
     } catch (e) {
-        console.error("claudeJudgeInput error:", e);
+        console.error("claudeJudgeInput error:", safeErrorMessage(e));
         // Fail open to prevent breaking UX if API fails
         return { safe: true };
     }
@@ -113,7 +117,7 @@ Reply with ONLY one word: SAFE or UNSAFE`;
         }
         return { safe: true };
     } catch (e) {
-        console.error("claudeJudgeOutput error:", e);
+        console.error("claudeJudgeOutput error:", safeErrorMessage(e));
         return { safe: true }; // Fail-safe
     }
 }

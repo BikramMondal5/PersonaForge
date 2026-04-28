@@ -14,6 +14,10 @@ const apiKeySchema = new mongoose.Schema({
 
 const ApiKey = mongoose.models.ApiKey || mongoose.model('ApiKey', apiKeySchema);
 
+function safeErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Hash API key using SHA-256
  */
@@ -94,7 +98,7 @@ export async function authenticateApiKey(req, res, next) {
 
     next();
   } catch (error) {
-    console.error('API key authentication error:', error);
+    console.error('API key authentication error:', safeErrorMessage(error));
     return res.status(500).json({ 
       error: 'Authentication failed' 
     });

@@ -13,19 +13,19 @@ async function runTests() {
         console.log("\n--- Testing Prompt Builder ---");
         const rules = ["noHarmfulContent", "stayOnTopic"];
         const systemPrompt = buildSystemPrompt("You are a helpful travel assistant.", rules);
-        console.log("System Prompt Generated:\n" + systemPrompt);
+        console.log("System Prompt generated:", Boolean(systemPrompt));
 
         // 2. Test Claude Service (forgePersona)
         console.log("\n--- Testing forgePersona ---");
         const agentConfig = await forgePersona("A friendly travel agent for Japan.", "enthusiastic", rules);
-        console.log("Agent Config:", agentConfig);
+        console.log("Agent config generated:", Boolean(agentConfig));
 
         // 3. Test Memory Service
         console.log("\n--- Testing Memory Service ---");
         const sessionId = "test-session-" + Date.now();
         await saveHistory(sessionId, "Hi, I need info on Tokyo.", "Tokyo is amazing! What do you want to know?");
         const history = await getHistory(sessionId);
-        console.log("History:", history);
+        console.log("History entries:", history.length);
 
         // 4. Test Guardrails (Layer 1 - Keyword)
         console.log("\n--- Testing Guardrails (Keyword) ---");
@@ -41,7 +41,7 @@ async function runTests() {
 
         console.log("\nAll individual service tests passed!");
     } catch (error) {
-        console.error("Test failed:", error);
+        console.error("Test failed:", error instanceof Error ? error.message : String(error));
     }
     process.exit(0);
 }

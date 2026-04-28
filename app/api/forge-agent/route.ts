@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+function logForgeError(error: unknown) {
+  console.error('Forge API error', {
+    name: error instanceof Error ? error.name : 'Error',
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { prompt } = await req.json()
@@ -18,7 +25,15 @@ export async function POST(req: NextRequest) {
       // Simulate brief delay
       await new Promise(resolve => setTimeout(resolve, 3000))
 
-      const mockResponses: Record<string, any> = {
+      const mockResponses: Record<string, {
+        agentName: string
+        tone: string
+        domain: string
+        memory: string
+        responseStyle: string
+        guardrails: string[]
+        systemPrompt: string
+      }> = {
         "startup": {
           "agentName": "Startup Mentor AI",
           "tone": "Friendly and supportive",
@@ -108,12 +123,12 @@ ${prompt}`
     try {
       const config = JSON.parse(content)
       return NextResponse.json(config)
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: 'Failed to parse Groq AI response' }, { status: 500 })
     }
 
-  } catch (error: any) {
-    console.error('Forge API error:', error)
+  } catch (error: unknown) {
+    logForgeError(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

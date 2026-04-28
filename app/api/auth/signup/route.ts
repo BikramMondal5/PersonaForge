@@ -3,6 +3,17 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { hashPassword, generateToken } from '@/lib/auth'
 
+function logAuthRouteError(context: string, error: unknown) {
+  console.error(context, {
+    name: error instanceof Error ? error.name : 'Error',
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
+function isDuplicateKeyError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB()
@@ -71,10 +82,10 @@ export async function POST(request: NextRequest) {
       token
     }, { status: 201 })
 
-  } catch (error: any) {
-    console.error('Signup error:', error)
+  } catch (error: unknown) {
+    logAuthRouteError('Signup error', error)
     
-    if (error.code === 11000) {
+    if (isDuplicateKeyError(error)) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }

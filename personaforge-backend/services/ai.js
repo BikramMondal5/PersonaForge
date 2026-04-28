@@ -9,6 +9,10 @@ import { readFileTool } from "./readFileTool.js";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
+function safeErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 function createGroqModel(temperature = 0.7) {
     return new ChatOpenAI({
         model: GROQ_MODEL,
@@ -56,8 +60,8 @@ Return: {{ "name": "...", "systemPrompt": "...", "domain": "...", "sampleReply":
         
         const parsed = JSON.parse(cleanedRes.trim());
         return parsed;
-    } catch (e) {
-        console.error("Failed to parse JSON from Groq:", res);
+    } catch {
+        console.error("Failed to parse JSON from Groq response.");
         throw new Error("Invalid format returned by the model during persona creation.");
     }
 }
@@ -98,7 +102,7 @@ export async function chatWithPersona(systemPrompt, history, userMessage, enable
                 ? lastMessage.content
                 : JSON.stringify(lastMessage.content);
         } catch (error) {
-            console.error("Agent with tools failed, falling back to simple chat:", error.message);
+            console.error("Agent with tools failed, falling back to simple chat:", safeErrorMessage(error));
             // Fall back to simple chat without tools
         }
     }

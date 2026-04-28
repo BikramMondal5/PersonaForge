@@ -4,6 +4,12 @@ import Agent from '@/models/Agent'
 import User from '@/models/User'
 import { verifyToken } from '@/lib/auth'
 
+type AuthIdentity = {
+  userId?: string
+  email?: string
+  name?: string
+}
+
 const FIELD_LIMITS = {
   name: 100,
   description: 500,
@@ -42,7 +48,58 @@ function isValidationError(error: unknown): error is { name: string; errors?: Re
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'ValidationError'
 }
 
-async function getAuthenticatedUserId(request: NextRequest) {
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function getErrorName(error: unknown) {
+  return error instanceof Error ? error.name : 'Error'
+}
+
+function logRouteError(context: string, error: unknown) {
+  console.error(context, {
+    name: getErrorName(error),
+    message: getErrorMessage(error)
+  })
+}
+
+function isServiceConfigError(error: unknown) {
+  const message = getErrorMessage(error)
+  return message.includes('MONGODB_URI') || message.includes('JWT_SECRET') || message.includes('NEXTAUTH_SECRET')
+}
+
+function isDatabaseConnectionError(error: unknown) {
+  if (typeof error !== 'object' || error === null) {
+    return false
+  }
+
+  const name = 'name' in error ? String(error.name) : ''
+  return name.includes('Mongo') || name.includes('MongooseServerSelectionError')
+}
+
+function isObjectId(value: string) {
+  return /^[a-f\d]{24}$/i.test(value)
+}
+
+function serviceErrorResponse(error: unknown) {
+  if (isServiceConfigError(error)) {
+    return NextResponse.json(
+      { error: 'Server configuration is incomplete. Please check deployment environment variables.' },
+      { status: 503 }
+    )
+  }
+
+  if (isDatabaseConnectionError(error)) {
+    return NextResponse.json(
+      { error: 'Database connection failed. Please check the deployed MongoDB configuration and network access.' },
+      { status: 503 }
+    )
+  }
+
+  return null
+}
+
+async function getAuthIdentity(request: NextRequest): Promise<AuthIdentity | null> {
   const authHeader = request.headers.get('authorization')
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -50,9 +107,13 @@ async function getAuthenticatedUserId(request: NextRequest) {
 
     try {
       const decoded = verifyToken(token)
-      return decoded.userId
-    } catch (error) {
-      console.warn('Ignoring invalid bearer token and checking session auth:', error)
+      return {
+        userId: decoded.userId,
+        email: decoded.email,
+        name: decoded.fullName
+      }
+    } catch {
+      console.warn('Ignoring invalid bearer token and checking session auth')
     }
   }
 
@@ -63,7 +124,35 @@ async function getAuthenticatedUserId(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET
   })
 
-  return typeof token?.userId === 'string' ? token.userId : null
+  if (!token) {
+    return null
+  }
+
+  return {
+    userId: typeof token.userId === 'string' ? token.userId : undefined,
+    email: typeof token.email === 'string' ? token.email : undefined,
+    name: typeof token.name === 'string' ? token.name : undefined
+  }
+}
+
+async function getOrCreateUser(identity: AuthIdentity) {
+  let user = identity.userId && isObjectId(identity.userId) ? await User.findById(identity.userId) : null
+
+  if (!user && identity.email) {
+    user = await User.findOne({ email: identity.email })
+  }
+
+  if (!user && identity.email) {
+    user = await User.create({
+      fullName: identity.name || identity.email.split('@')[0] || 'OAuth User',
+      email: identity.email,
+      password: 'oauth-user',
+      isVerified: true,
+      plan: 'starter'
+    })
+  }
+
+  return user
 }
 
 // Get user's agents
@@ -71,15 +160,24 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB()
 
-    const userId = await getAuthenticatedUserId(request)
+    const identity = await getAuthIdentity(request)
 
-    if (!userId) {
+    if (!identity) {
       return NextResponse.json(
         { error: 'Authorization required' },
         { status: 401 }
       )
     }
 
+    const user = await getOrCreateUser(identity)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const userId = user._id
     const agents = await Agent.find({ userId })
       .sort({ createdAt: -1 })
       .select('-__v')
@@ -87,7 +185,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ agents }, { status: 200 })
 
   } catch (error: unknown) {
-    console.error('Get agents error:', error)
+    logRouteError('Get agents error', error)
+
+    const serviceError = serviceErrorResponse(error)
+    if (serviceError) {
+      return serviceError
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -100,9 +204,9 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB()
 
-    const userId = await getAuthenticatedUserId(request)
+    const identity = await getAuthIdentity(request)
 
-    if (!userId) {
+    if (!identity) {
       return NextResponse.json(
         { error: 'Authorization required' },
         { status: 401 }
@@ -146,7 +250,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user's plan limits
-    const user = await User.findById(userId)
+    const user = await getOrCreateUser(identity)
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -154,6 +258,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const userId = user._id
     const agentCount = await Agent.countDocuments({ userId })
     
     // Plan limits
@@ -199,7 +304,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error: unknown) {
-    console.error('Create agent error:', error)
+    logRouteError('Create agent error', error)
 
     if (isValidationError(error)) {
       const validationMessages = Object.values(error.errors || {})
@@ -210,6 +315,11 @@ export async function POST(request: NextRequest) {
         { error: validationMessages[0] || 'Invalid agent data' },
         { status: 400 }
       )
+    }
+
+    const serviceError = serviceErrorResponse(error)
+    if (serviceError) {
+      return serviceError
     }
 
     return NextResponse.json(

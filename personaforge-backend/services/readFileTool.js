@@ -82,8 +82,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
     const requestedEncoding = normalizeEncoding(encoding);
     const requestedPath = file_path;
 
-    console.log('[read_file] access attempt', { file_path: requestedPath, file_type, encoding: requestedEncoding });
-
     try {
         if (!SUPPORTED_ENCODINGS.has(requestedEncoding)) {
             return createResult({
@@ -101,7 +99,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
         const inferredFileType = file_type || extension.replace('.', '') || 'text';
 
         if (!SUPPORTED_TEXT_EXTENSIONS.has(extension)) {
-            console.log('[read_file] rejected unsupported format', { file_path: requestedPath, extension });
             return createResult({
                 file_path: requestedPath,
                 file_type: inferredFileType,
@@ -118,7 +115,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
             stats = await fs.stat(resolvedPath);
         } catch (error) {
             const code = error.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_STAT_FAILED';
-            console.log('[read_file] stat failed', { file_path: requestedPath, code });
             return createResult({
                 file_path: requestedPath,
                 file_type: inferredFileType,
@@ -144,7 +140,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
         }
 
         if (stats.size > MAX_FILE_SIZE_BYTES) {
-            console.log('[read_file] rejected oversized file', { file_path: requestedPath, size_bytes: stats.size });
             return createResult({
                 file_path: requestedPath,
                 file_type: inferredFileType,
@@ -164,7 +159,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
             const code = error.code === 'EACCES' || error.code === 'EPERM'
                 ? 'PERMISSION_DENIED'
                 : 'READ_FAILED';
-            console.log('[read_file] read failed', { file_path: requestedPath, code });
             return createResult({
                 file_path: requestedPath,
                 file_type: inferredFileType,
@@ -178,7 +172,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
         }
 
         if (content.length === 0) {
-            console.log('[read_file] empty file', { file_path: requestedPath });
             return createResult({
                 ok: true,
                 file_path: requestedPath,
@@ -193,7 +186,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
             });
         }
 
-        console.log('[read_file] success', { file_path: requestedPath, size_bytes: stats.size });
         return createResult({
             ok: true,
             file_path: requestedPath,
@@ -204,7 +196,6 @@ export async function readFileContent({ file_path, file_type, encoding = 'utf8' 
             error: null
         });
     } catch (error) {
-        console.log('[read_file] rejected unsafe request', { file_path: requestedPath, message: error.message });
         return createResult({
             file_path: requestedPath,
             encoding: requestedEncoding,
