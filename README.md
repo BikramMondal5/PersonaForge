@@ -131,11 +131,11 @@ PersonaForge addresses a core challenge in modern AI systems:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/BikramMondal5/personaforge.git
+git clone https://github.com/BikramMondal5/PersonaForge.git
 ```
 2. Navigate to the project directory:
 ```bash
-cd personaforge
+cd PersonaForge
 ```
 3. Install dependencies:
 ```bash

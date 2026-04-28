@@ -62,6 +62,11 @@ Analyze the user description and generate a configuration with the following fie
 - guardrails (array of strings)
 - systemPrompt
 
+Field limits:
+- agentName, tone, domain, and responseStyle must each be 100 characters or less.
+- Each guardrail must be 100 characters or less.
+- systemPrompt must be 2000 characters or less.
+
 Return only valid JSON. Use this format:
 {
   "agentName": "...",
